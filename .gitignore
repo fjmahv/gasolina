@@ -1,0 +1,10 @@
+# Ignorar el archivo de salida generado por el programa
+Gasolina.json
+
+# Ignorar archivos temporales de Python
+__pycache__/
+*.pyc
+
+# Ignorar archivos de sistema
+.DS_Store
+Thumbs.db
