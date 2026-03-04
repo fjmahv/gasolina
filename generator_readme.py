@@ -1,4 +1,8 @@
-# 💧 AquaSpain: Dashboard del Estado de los Embalses en España
+import os
+
+# Usamos comillas simples (''') para los bloques de código dentro del texto
+# para evitar que la interfaz visual de chat se rompa al leerlo.
+readme_content = """# 💧 AquaSpain: Dashboard del Estado de los Embalses en España
 
 AquaSpain es una aplicación web interactiva que permite visualizar el estado actual y la evolución histórica de las reservas de agua en los embalses españoles. 
 
@@ -28,17 +32,17 @@ El proyecto se divide en tres pilares fundamentales:
 ## 🛠️ Instalación y Despliegue Local
 
 ### 1. Clonar el repositorio
-```bash
+'''bash
 git clone https://github.com/fjmahv/aquaspain.git
 cd aquaspain
-```
+'''
 
 ### 2. Levantar el Frontend (Web)
 Necesitas tener instalado [Node.js](https://nodejs.org/).
-```bash
+'''bash
 npm install
 npm run dev
-```
+'''
 
 ### 3. Ejecutar la ETL (Python) manualmente
 **Requisito indispensable del sistema operativo:**
@@ -47,16 +51,16 @@ Debes instalar la librería que lee bases de datos Access (`mdbtools`):
 * **Linux (Ubuntu/Debian):** `sudo apt-get install mdbtools`
 
 **Instalar dependencias y ejecutar:**
-```bash
+'''bash
 pip install -r requirements.txt
 python etl/etl.py
-```
+'''
 
 ---
 
 ## 📁 Estructura del Repositorio
 
-```text
+'''text
 aquaspain/
 ├── .github/workflows/      # Configuración del robot de automatización
 ├── public/                 # Archivos estáticos y JSON de datos
@@ -66,7 +70,7 @@ aquaspain/
 │   └── etl.py              # Script principal
 ├── requirements.txt        # Dependencias de Python
 └── README.md               # Esta documentación
-```
+'''
 
 ---
 
@@ -76,3 +80,20 @@ Los datos brutos son generados por el **Ministerio para la Transición Ecológic
 * **Enlace origen:** [Histórico de embalses MITECO](https://www.miteco.gob.es/es/agua/temas/evaluacion-de-los-recursos-hidricos/boletin-hidrologico/Historico-de-embalses.html)
 
 *Disclaimer: Esta aplicación es un proyecto independiente y no tiene vinculación oficial con el MITECO.*
+"""
+
+def main():
+    # Aquí Python convierte las comillas simples de vuelta al formato 
+    # original de Markdown (tres acentos graves) antes de guardar el archivo.
+    contenido_final = readme_content.replace("'''", "`" * 3)
+    
+    try:
+        with open("README.md", "w", encoding="utf-8") as f:
+            f.write(contenido_final)
+        print("✅ ¡Éxito! El archivo README.md ha sido generado correctamente en la carpeta actual.")
+        print("Puedes borrar este script de Python si ya no lo necesitas.")
+    except Exception as e:
+        print(f"❌ Ha ocurrido un error al intentar crear el archivo: {e}")
+
+if __name__ == "__main__":
+    main()
