@@ -171,7 +171,8 @@ def process_car_stats(car: Car, car_refuels: List[Refuel]):
             individual_refuel_history.append({
                 "date": curr.refuel_date, "month": m,
                 "consumption": (curr.refuel_litres / d * 100) if d > 0 else 0,
-                "speed": s_ref
+                "speed": s_ref,
+                "refuel_partial_mileage": round(d, 1)  # <-- NUEVO CAMPO
             })
 
     y_hist = [{"year": y, "total_km": round(d["km"], 1), "total_litres": round(d["l_total"], 1), "total_cost": round(d["cost"], 2), "average_consumption_l_per_100km": round(d["l_cons"]/d["km"]*100, 2) if d["km"] > 0 else 0, "number_of_refuels": d["refs"]} for y, d in sorted(yearly.items())]
@@ -197,6 +198,7 @@ def process_car_stats(car: Car, car_refuels: List[Refuel]):
             "date": stat["date"].strftime("%Y-%m-%d"),
             "consumption": round(stat["consumption"], 2),
             "speed": round(stat["speed"], 2),
+            "refuel_partial_mileage": stat.get("refuel_partial_mileage", 0),  # <-- NUEVO
             "historical_month_avg_consumption": hist_avg.get("average_consumption", 0),
             "historical_month_avg_speed": hist_avg.get("average_speed", 0)
         })
