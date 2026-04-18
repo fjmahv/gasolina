@@ -110,6 +110,27 @@ def load_data(refuels_path: str):
 def process_car_stats(car: Car, car_refuels: List[Refuel]):
     sorted_r = sorted(car_refuels, key=lambda x: x.refuel_date)
     if not sorted_r: return None, 0
+
+    def summarize_refuels(refuels_block):
+        if not refuels_block:
+            return {
+                "refuels_count": 0,
+                "consumption": 0,
+                "speed": 0,
+                "distance_km": 0
+            }
+
+        total_litres = sum(r["litres"] for r in refuels_block)
+        total_km = sum(r["distance_km"] for r in refuels_block)
+        total_hours = sum(r["trip_time_hours"] for r in refuels_block)
+        count = len(refuels_block)
+
+        return {
+            "refuels_count": count,
+            "consumption": round((total_litres / total_km) * 100, 2) if total_km > 0 else 0,
+            "speed": round(total_km / total_hours, 2) if total_hours > 0 else 0,
+            "distance_km": round(total_km / count, 1) if count > 0 else 0
+        }
     
     periods = []
     curr_p = [sorted_r[0]]
@@ -170,9 +191,12 @@ def process_car_stats(car: Car, car_refuels: List[Refuel]):
             
             individual_refuel_history.append({
                 "date": curr.refuel_date, "month": m,
+                "litres": curr.refuel_litres,
+                "distance_km": d,
+                "trip_time_hours": h_ref,
                 "consumption": (curr.refuel_litres / d * 100) if d > 0 else 0,
                 "speed": s_ref,
-                "refuel_partial_mileage": round(d, 1)  # <-- NUEVO CAMPO
+                "refuel_partial_mileage": round(d, 1)
             })
 
     y_hist = [{"year": y, "total_km": round(d["km"], 1), "total_litres": round(d["l_total"], 1), "total_cost": round(d["cost"], 2), "average_consumption_l_per_100km": round(d["l_cons"]/d["km"]*100, 2) if d["km"] > 0 else 0, "number_of_refuels": d["refs"]} for y, d in sorted(yearly.items())]
@@ -190,18 +214,27 @@ def process_car_stats(car: Car, car_refuels: List[Refuel]):
         for label, data in speed_ranges_stats.items():
             speed_range_history.append({"range_label": label, "average_consumption": round(data["l"] / data["km"] * 100, 2) if data["km"] > 0 else 0, "number_of_refuels": data["refs"]})
 
-    # Comparativa últimos 4 repostajes
-    recent_comparison = []
-    for stat in individual_refuel_history[-4:]:
-        hist_avg = m_hist_dict.get(stat["month"], {})
-        recent_comparison.append({
-            "date": stat["date"].strftime("%Y-%m-%d"),
-            "consumption": round(stat["consumption"], 2),
-            "speed": round(stat["speed"], 2),
-            "refuel_partial_mileage": stat.get("refuel_partial_mileage", 0),  # <-- NUEVO
-            "historical_month_avg_consumption": hist_avg.get("average_consumption", 0),
-            "historical_month_avg_speed": hist_avg.get("average_speed", 0)
-        })
+    recent_comparison = {}
+    if individual_refuel_history:
+        last_refuel = individual_refuel_history[-1]
+        previous_3_refuels = individual_refuel_history[-4:-1]
+        target_month = last_refuel["month"]
+        historical_same_month = [r for r in individual_refuel_history if r["month"] == target_month]
+
+        recent_comparison = {
+            "last_refuel": {
+                "date": last_refuel["date"].strftime("%Y-%m-%d"),
+                "consumption": round((last_refuel["litres"] / last_refuel["distance_km"]) * 100, 2) if last_refuel["distance_km"] > 0 else 0,
+                "speed": round(last_refuel["distance_km"] / last_refuel["trip_time_hours"], 2) if last_refuel["trip_time_hours"] > 0 else 0,
+                "distance_km": round(last_refuel["distance_km"], 1)
+            },
+            "last_3_refuels_average": summarize_refuels(previous_3_refuels),
+            "historical_month_average": {
+                "month_id": target_month,
+                "month_name": MONTH_NAMES[target_month],
+                **summarize_refuels(historical_same_month)
+            }
+        }
 
     total_km = sum(d["total_km"] for d in y_hist)
     total_l = sum(d["total_litres"] for d in y_hist)
@@ -233,12 +266,47 @@ def process_car_stats(car: Car, car_refuels: List[Refuel]):
 def display_ui(data: Dict):
     def clear(): os.system('cls' if os.name == 'nt' else 'clear')
     def header(txt): print("\n" + "="*80 + "\n" + f"{txt:^80}" + "\n" + "="*80)
+
     def print_recent(recent, has_speed):
-        print(f"  {'Fecha':<12} | {'Consumo':<8} | {'(Mes Hist)':<10}" + (" | {'V. Media':<10} | {'(V. Mes Hist)':<12}" if has_speed else ""))
-        print("  " + "-"*(40 + (30 if has_speed else 0)))
-        for r in recent:
-            row = f"  {r['date']:<12} | {r['consumption']:<8.2f} | ({r['historical_month_avg_consumption']:<8.2f})"
-            if has_speed: row += f" | {r['speed']:<10.2f} | ({r['historical_month_avg_speed']:<12.2f})"
+        print(f"  {'Concepto':<32} | {'Consumo':<8}" + (" | {'V. Media':<10}" if has_speed else "") + f" | {'Distancia':<10}")
+        print("  " + "-"*(70 + (13 if has_speed else 0)))
+
+        rows = [
+            (f"Último repostaje ({recent['last_refuel']['date']})", recent["last_refuel"]),
+            ("Media 3 anteriores", recent["last_3_refuels_average"]),
+            (f"Histórico {recent['historical_month_average']['month_name']}", recent["historical_month_average"])
+        ]
+
+        for label, r in rows:
+            row = f"  {label:<32} | {r['consumption']:<8.2f}"
+            if has_speed: row += f" | {r['speed']:<10.2f}"
+            row += f" | {r['distance_km']:<10.1f}"
+            print(row)
+
+    def print_yearly(yearly):
+        print("\nHISTÓRICO ANUAL:")
+        print(f"  {'Año':<6} | {'Km':<10} | {'Litros':<10} | {'Coste':<10} | {'Consumo':<9} | {'Repost.':<8}")
+        print("  " + "-"*72)
+        for y in yearly:
+            print(
+                f"  {y['year']:<6} | {y['total_km']:<10.1f} | {y['total_litres']:<10.1f} | "
+                f"{y['total_cost']:<10.2f} | {y['average_consumption_l_per_100km']:<9.2f} | {y['number_of_refuels']:<8}"
+            )
+
+    def print_monthly(monthly, has_speed):
+        print("\nHISTÓRICO MENSUAL:")
+        header_line = f"  {'Mes':<12} | {'Km Med':<10} | {'Consumo':<9} | {'Repost.':<8}"
+        if has_speed:
+            header_line += f" | {'V. Media':<10}"
+        print(header_line)
+        print("  " + "-"*(49 + (13 if has_speed else 0)))
+        for m in monthly:
+            row = (
+                f"  {m['month_name']:<12} | {m['average_km']:<10.1f} | {m['average_consumption']:<9.2f} | "
+                f"{m['average_refuels']:<8}"
+            )
+            if has_speed:
+                row += f" | {m['average_speed']:<10.2f}"
             print(row)
 
     gs = data["global_statistics"]["all_vehicles"]
@@ -255,10 +323,15 @@ def display_ui(data: Dict):
         print(f"Período: {ts['first_refuel_date']} al {ts['last_refuel_date']} | Consumo: {ts['average_consumption_l_per_100km']:.2f} L/100")
         
         if "recent_refuels_comparison" in ts and ts["recent_refuels_comparison"]:
-            print("\nÚLTIMOS REPOSTAJES VS MEDIA HISTÓRICA DEL MES:")
+            print("\nÚLTIMO REPOSTAJE, MEDIA DE LOS 3 ANTERIORES E HISTÓRICO DEL MES:")
             print_recent(ts["recent_refuels_comparison"], car["has_temporal_data"])
 
         input("\n[Enter para ver históricos anuales y mensuales...]")
+        clear()
+        header(f"HISTÓRICOS - VEHÍCULO {car['car_id']}: {cd['brand']} {cd['model']}")
+        print_yearly(ts["yearly_history"])
+        print_monthly(ts["monthly_history"], car["has_temporal_data"])
+        input("\n[Enter para continuar al siguiente vehículo...]")
 
     header("FIN DEL INFORME")
 
